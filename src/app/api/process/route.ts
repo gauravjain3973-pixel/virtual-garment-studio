@@ -76,8 +76,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imageUrl });
   } catch (error) {
     console.error("Replicate API error:", error);
+    const message =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
     return NextResponse.json(
-      { error: "Failed to process images. Please try again." },
+      { error: message },
       { status: 500 }
     );
   }
