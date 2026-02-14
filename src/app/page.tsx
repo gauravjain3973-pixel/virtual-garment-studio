@@ -89,25 +89,13 @@ export default function Home() {
       setCurrentModelIndex(modelIdx + 1);
 
       try {
-        // Upload images separately to avoid Vercel body size limit
-        const uploadFile = async (file: File) => {
-          const fd = new FormData();
-          fd.append("file", file);
-          const res = await fetch("/api/upload", { method: "POST", body: fd });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || "Upload failed.");
-          return json.url as string;
-        };
-
-        const [modelUrl, garmentUrl] = await Promise.all([
-          uploadFile(presetModels[modelIdx].file),
-          uploadFile(entry.file),
-        ]);
+        const formData = new FormData();
+        formData.append("modelImage", presetModels[modelIdx].file);
+        formData.append("garmentImage", entry.file);
 
         const response = await fetch("/api/process", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ modelUrl, garmentUrl }),
+          body: formData,
         });
 
         const data = await response.json();
