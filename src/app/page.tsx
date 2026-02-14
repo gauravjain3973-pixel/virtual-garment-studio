@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, FormEvent } from "react";
+import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import PresetModelsUpload, {
   PresetModel,
 } from "@/components/PresetModelsUpload";
@@ -35,8 +35,25 @@ export default function Home() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Gallery
+  // Gallery — load from localStorage on mount
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const galleryLoaded = useRef(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("gallery");
+      if (saved) setGallery(JSON.parse(saved));
+    } catch {}
+    galleryLoaded.current = true;
+  }, []);
+
+  const updateGallery = useCallback((updater: (prev: GalleryItem[]) => GalleryItem[]) => {
+    setGallery((prev) => {
+      const next = updater(prev);
+      try { localStorage.setItem("gallery", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   // Track which model to use next (persists across batches)
   const nextModelRef = useRef(0);
@@ -87,10 +104,10 @@ export default function Home() {
           throw new Error(data.error || "Something went wrong.");
         }
 
-        const filename = `${style}-${color}-${i + 1}.jpg`;
+        const filename = `${style}-${color}-1.jpg`;
 
         // Add to gallery
-        setGallery((prev) => [
+        updateGallery((prev) => [
           {
             id: `${Date.now()}-${i}`,
             resultUrl: data.imageUrl,
@@ -119,7 +136,7 @@ export default function Home() {
   };
 
   const handleDeleteGalleryItems = (ids: string[]) => {
-    setGallery((prev) => prev.filter((item) => !ids.includes(item.id)));
+    updateGallery((prev) => prev.filter((item) => !ids.includes(item.id)));
   };
 
   return (
