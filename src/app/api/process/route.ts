@@ -14,11 +14,24 @@ function validateImage(file: File, label: string): string | null {
   return null;
 }
 
-async function fileToDataUrl(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
-  return `data:${file.type};base64,${base64}`;
+async function uploadToReplicate(file: File): Promise<string> {
+  const resp = await fetch("https://api.replicate.com/v1/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+      "Content-Disposition": `attachment; filename="${file.name}"`,
+      "Content-Type": file.type,
+    },
+    body: Buffer.from(await file.arrayBuffer()),
+  });
+  if (!resp.ok) {
+    throw new Error(`Failed to upload ${file.name}: ${resp.statusText}`);
+  }
+  const data = await resp.json();
+  return data.urls.get;
 }
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,9 +56,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: garmentError }, { status: 400 });
     }
 
-    const [modelDataUrl, garmentDataUrl] = await Promise.all([
-      fileToDataUrl(modelImage),
-      fileToDataUrl(garmentImage),
+    // Upload images to Replicate's file hosting (much faster than base64)
+    const [modelUrl, garmentUrl] = await Promise.all([
+      uploadToReplicate(modelImage),
+      uploadToReplicate(garmentImage),
     ]);
 
     const output = await replicate.run("google/nano-banana-pro", {
@@ -58,9 +72,9 @@ export async function POST(request: NextRequest) {
           "The new garment should fit naturally on the person's body with realistic fabric texture, " +
           "drape, wrinkles, and stitching details matching the flat-lay garment provided. " +
           "Produce a photorealistic, catalog-quality image with sharp focus and seamless blending.",
-        image_input: [modelDataUrl, garmentDataUrl],
+        image_input: [modelUrl, garmentUrl],
         aspect_ratio: "match_input_image",
-        resolution: "4K",
+        resolution: "2K",
         output_format: "jpg",
         safety_filter_level: "block_only_high",
       },
